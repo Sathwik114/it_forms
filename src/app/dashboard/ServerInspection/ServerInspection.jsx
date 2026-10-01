@@ -111,6 +111,18 @@ export default function ServerInspectionChecklist({
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(setToday, []);
 
+  const years = useMemo(() => {
+    const y = new Date().getFullYear();
+    return Array.from({ length: 21 }, (_, i) => y - 10 + i);
+  }, []);
+
+  const handleYearChange = (e) => {
+    const y = Number(e.target.value);
+    const max = new Date(y, (month ?? 0) + 1, 0).getDate();
+    setYear(y);
+    if (day > max) setDay(max);
+  };
+
   const daysInMonth = useMemo(
     () => (year === null ? 31 : new Date(year, month + 1, 0).getDate()),
     [year, month]
