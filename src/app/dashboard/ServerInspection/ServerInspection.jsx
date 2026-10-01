@@ -69,6 +69,8 @@ const css = `
   .chk-table tbody td { height: 38px; font-size: 13px; }
   .chk-table .nowrap { white-space: nowrap; padding-left: 1px; padding-right: 1px; }
   .chk-table td.left { text-align: left; padding-left: 4px; }
+  .chk-table input { width: 100%; height: 100%; box-sizing: border-box; border: 0; background: transparent; padding: 2px; font: inherit; font-size: 13px; text-align: center; outline: none; }
+  .chk-table input:focus { background: #eef5ff; }
   .chk-table tr.chk-meta td { background: #fff; height: 24px; font-weight: 700; text-align: left; padding-left: 4px; font-size: 12px; }
 
   .chk-footer { text-align: center; font-size: 13px; font-weight: 700; margin-top: 10px; }
@@ -99,6 +101,15 @@ export default function ServerInspectionChecklist({
   const [month, setMonth] = useState(null); // 0-11
   const [day, setDay] = useState(null);
   const [downloading, setDownloading] = useState(false);
+  const [statuses, setStatuses] = useState(() => SERVERS.map((s) => s.status));
+
+  const handleStatusChange = (index, value) => {
+    setStatuses((prev) => {
+      const next = [...prev];
+      next[index] = value;
+      return next;
+    });
+  };
   const sheetRef = useRef(null);
 
   const setToday = () => {
@@ -130,7 +141,8 @@ export default function ServerInspectionChecklist({
 
   const handleMonthChange = (e) => {
     const m = Number(e.target.value);
-    const max = new Date(year, m + 1, 0).getDate();
+    const y = year ?? new Date().getFullYear();
+    const max = new Date(y, m + 1, 0).getDate();
     setMonth(m);
     if (day > max) setDay(max); // e.g. 31 Jan -> Feb
   };
@@ -166,6 +178,15 @@ export default function ServerInspectionChecklist({
           >
             {FORM_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          Year
+          <select value={year ?? ""} onChange={handleYearChange} disabled={year === null}>
+            {years.map((y) => (
+              <option key={y} value={y}>{y}</option>
             ))}
           </select>
         </label>
@@ -236,7 +257,14 @@ export default function ServerInspectionChecklist({
                   <td className="left nowrap">{s.type}</td>
                   <td>{s.brand}</td>
                   <td className="left">{s.usage}</td>
-                  <td>{s.status}</td>
+                  <td>
+                    <input
+                      type="text"
+                      className="status-input"
+                      value={statuses[i] ?? s.status}
+                      onChange={(e) => handleStatusChange(i, e.target.value)}
+                    />
+                  </td>
                   {CHECK_HEADS.map((h) => (
                     <td key={h}></td>
                   ))}

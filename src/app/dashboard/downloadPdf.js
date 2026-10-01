@@ -168,9 +168,9 @@ export async function downloadSheetAsPdf(sheetEl, filename, orientation = "portr
   // For Server Inspection (20 cols), Type = 8.2% so "System Storage" stays in a single line
   if (isLandscape && numCols === 20) {
     colPercents = [
-      2.8, 7.0, 8.2, 4.0, 9.2, 3.8, // S.No, Server/Device, Type, Brand, Usage, Status
+      2.8, 7.0, 8.2, 4.0, 9.2, 4.2, // S.No, Server/Device, Type, Brand, Usage, Status (4.2% for typing)
       3.4, 3.4, 3.2, 3.4, 3.4, 3.8, 5.4, 3.2, 4.2, 4.4, 4.4, // 11 inspection cols
-      7.8, 8.3, 6.7, // Remarks, Checked By, Date
+      7.4, 8.3, 6.7, // Remarks, Checked By, Date // Remarks, Checked By, Date
     ];
   }
 
@@ -692,9 +692,9 @@ export async function downloadSheetAsExcel(sheetEl, filename, orientation = "por
 
   if (isLandscape && numCols === 20) {
     colPercents = [
-      2.8, 7.0, 8.2, 4.0, 9.2, 3.8, // S.No, Server/Device, Type (8.2%), Brand, Usage, Status
+      2.8, 7.0, 8.2, 4.0, 9.2, 4.2, // S.No, Server/Device, Type, Brand, Usage, Status (4.2% for typing)
       3.4, 3.4, 3.2, 3.4, 3.4, 3.8, 5.4, 3.2, 4.2, 4.4, 4.4, // 11 inspection cols
-      7.8, 8.3, 6.7, // Remarks, Checked By, Date
+      7.4, 8.3, 6.7, // Remarks, Checked By, Date // Remarks, Checked By, Date
     ];
   }
 

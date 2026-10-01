@@ -1,0 +1,25 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+model ITFormsEmpMast {
+  EmpCode String  @id(map: "PK_ITFormsEmpMast") @db.NVarChar(50)
+  EmpName String? @db.NVarChar(50)
+}
+
+model UploadedForms {
+  Id                Int       @id(map: "PK__Uploaded__3214EC070E6B076F") @default(autoincrement())
+  Description       String    @db.NVarChar(500)
+  FileName          String    @db.NVarChar(255)
+  FileType          String    @db.NVarChar(100)
+  FileSize          Int
+  FileSizeFormatted String    @db.NVarChar(50)
+  FileData          Bytes
+  UploadedBy        String    @db.NVarChar(100)
+  UploadedAt        DateTime? @default(now(), map: "DF__UploadedF__Uploa__117F9D94") @db.DateTime
+}

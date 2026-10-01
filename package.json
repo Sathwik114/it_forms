@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@prisma/client": "6.16.2",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.4.2",
     "html2pdf.js": "^0.14.0",
@@ -17,6 +18,7 @@
     "ldapjs": "^3.0.7",
     "mssql": "^12.7.0",
     "next": "^16.3.0",
+    "prisma": "6.16.2",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "xlsx": "^0.18.5"

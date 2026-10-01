@@ -1,8 +1,7 @@
 import './page.css';
 import { cookies } from 'next/headers';
 import * as jose from 'jose';
-import LogoutButton from './LogoutButton';
-import ServerRoomChecklist from './ITTemparature/tempareture';
+import DashboardClient from './DashboardClient';
 import { getPayPool, sql } from '@/lib/payDb';
 
 async function getEmployeeName(empcode) {
@@ -47,45 +46,5 @@ export default async function Dashboard() {
     empName = await getEmployeeName(user.username);
   }
 
-  return (
-    <div className="dashboard-root" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#f2f2f2', color: '#333333' }}>
-      {/* Fixed Navbar */}
-      <nav
-        className="no-print"
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 1000,
-          height: '56px',
-          boxSizing: 'border-box',
-          fontFamily: 'Arial, sans-serif',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '10px 20px',
-          borderBottom: '1px solid #cccccc',
-          backgroundColor: '#f8f9fa',
-          boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
-        }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <span style={{ fontWeight: 'bold', fontSize: '16px' }}>IT Forms Management System</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <span style={{ fontSize: '13px' }}>
-            Hello, <strong>{empName}</strong>
-          </span>
-          <LogoutButton />
-        </div>
-      </nav>
-
-      {/* Main Container */}
-      <main className="dashboard-main" style={{ flex: 1, paddingTop: '56px' }}>
-        <style>{`@media print { .dashboard-root { background-color: #ffffff !important; min-height: 0 !important; } .dashboard-main { padding-top: 0 !important; } }`}</style>
-        <ServerRoomChecklist />
-      </main>
-    </div>
-  );
+  return <DashboardClient empName={empName} />;
 }
