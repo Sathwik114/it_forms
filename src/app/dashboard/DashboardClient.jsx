@@ -319,7 +319,7 @@ export default function DashboardClient({ empName }) {
                       Upload Forms
                     </span>
                     <span style={{ fontSize: "11px", color: "#64748b", lineHeight: 1.3 }}>
-                      Upload and compress forms (≤ 50 KB)
+                      Upload and compress forms (≤ 500 KB)
                     </span>
                   </div>
                 </button>

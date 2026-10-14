@@ -1,11 +1,11 @@
 import sql from "mssql";
 
 const dbConfig = {
-  user: process.env.Serbia_DB_USER || "paydev",
-  password: process.env.Serbia_DB_PASSWORD || "dev.gtipay@123",
-  server: process.env.Serbia_DB_SERVER || "10.40.10.105",
-  database: "ITForms",
-  port: parseInt(process.env.Serbia_DB_PORT || "1433", 10),
+  user: process.env.DB_USER || "sa",
+  password: process.env.DB_PASSWORD || "ccise054879+m",
+  server: process.env.DB_SERVER || "10.40.10.125",
+  database: process.env.DB_NAME || "ITForms",
+  port: parseInt(process.env.DB_PORT || "1433", 10),
   options: {
     encrypt: false,
     trustServerCertificate: true,

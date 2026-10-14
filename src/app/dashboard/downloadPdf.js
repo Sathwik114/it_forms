@@ -165,12 +165,12 @@ export async function downloadSheetAsPdf(sheetEl, filename, orientation = "portr
     colPercents = Array(numCols).fill(100 / (numCols || 1));
   }
 
-  // For Server Inspection (20 cols), Type = 8.2% so "System Storage" stays in a single line
+  // For Server Inspection (20 cols), Type = 8.2% so "System Storage" stays in a single line, Status = 5.2% so Active & Repair fit without cut off
   if (isLandscape && numCols === 20) {
     colPercents = [
-      2.8, 7.0, 8.2, 4.0, 9.2, 4.2, // S.No, Server/Device, Type, Brand, Usage, Status (4.2% for typing)
+      2.8, 7.0, 8.2, 4.0, 9.0, 5.2, // S.No, Server/Device, Type, Brand, Usage, Status (5.2%)
       3.4, 3.4, 3.2, 3.4, 3.4, 3.8, 5.4, 3.2, 4.2, 4.4, 4.4, // 11 inspection cols
-      7.4, 8.3, 6.7, // Remarks, Checked By, Date // Remarks, Checked By, Date
+      7.2, 7.7, 6.7, // Remarks (7.2%), Checked By (7.7%), Date (6.7%)
     ];
   }
 
@@ -692,9 +692,9 @@ export async function downloadSheetAsExcel(sheetEl, filename, orientation = "por
 
   if (isLandscape && numCols === 20) {
     colPercents = [
-      2.8, 7.0, 8.2, 4.0, 9.2, 4.2, // S.No, Server/Device, Type, Brand, Usage, Status (4.2% for typing)
+      2.8, 7.0, 8.2, 4.0, 9.0, 5.2, // S.No, Server/Device, Type, Brand, Usage, Status (5.2%)
       3.4, 3.4, 3.2, 3.4, 3.4, 3.8, 5.4, 3.2, 4.2, 4.4, 4.4, // 11 inspection cols
-      7.4, 8.3, 6.7, // Remarks, Checked By, Date // Remarks, Checked By, Date
+      7.2, 7.7, 6.7, // Remarks (7.2%), Checked By (7.7%), Date (6.7%)
     ];
   }
 

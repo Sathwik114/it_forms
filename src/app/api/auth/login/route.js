@@ -1,6 +1,18 @@
 import { NextResponse } from 'next/server';
 import * as jose from 'jose';
 import ldap from 'ldapjs';
+import prisma from '@/lib/prisma';
+
+function extractEmpCode(username) {
+  let normalized = (username || '').trim();
+  if (normalized.includes('\\')) {
+    normalized = normalized.split('\\').pop().trim();
+  }
+  if (normalized.includes('@')) {
+    normalized = normalized.split('@')[0].trim();
+  }
+  return normalized;
+}
 
 function buildCandidateDns(username, baseDN) {
   const normalized = (username || '').trim();
@@ -141,7 +153,8 @@ function ldapSearchThenBind(username, password) {
 
     const performSearch = () => {
       const filterTemplate = process.env.LDAP_SEARCH_FILTER || '(|(cn={u})(sAMAccountName={u})(uid={u})(userPrincipalName={u}))';
-      const filter = filterTemplate.replace(/\{u\}/g, username);
+      const cleanU = extractEmpCode(username);
+      const filter = filterTemplate.replace(/\{u\}/g, cleanU || username);
       if (process.env.LDAP_DEBUG === 'true') {
         try {
           console.info('LDAP search filter:', filter);
@@ -190,24 +203,59 @@ function ldapSearchThenBind(username, password) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const username = body.username || body.userId;
+    const rawUsername = body.username || body.userId;
     const password = body.password;
 
-    if (!username || !password) {
+    if (!rawUsername || !password) {
       return NextResponse.json(
         { error: 'Username and password are required' },
         { status: 400 }
       );
     }
 
+    const empCode = extractEmpCode(rawUsername);
+    if (!empCode) {
+      return NextResponse.json(
+        { error: 'Invalid username format' },
+        { status: 400 }
+      );
+    }
+
+    // Restriction: LDAP authentication ONLY works for IDs in ITFormsEmpMast.EmpCode
+    let empRecord = null;
+    try {
+      empRecord = await prisma.iTFormsEmpMast.findFirst({
+        where: {
+          EmpCode: empCode,
+        },
+      });
+    } catch (dbErr) {
+      console.error('Error verifying user against ITFormsEmpMast:', dbErr);
+      return NextResponse.json(
+        { error: 'Database verification failed. Please try again later.' },
+        { status: 500 }
+      );
+    }
+
+    if (!empRecord) {
+      if (process.env.LDAP_DEBUG === 'true') {
+        console.warn(`[AUTH] Access denied: employee code '${empCode}' not authorized in ITFormsEmpMast.`);
+      }
+      return NextResponse.json(
+        { error: `Access denied. Employee ID '${empCode}' is not authorized to access IT Forms.` },
+        { status: 403 }
+      );
+    }
+
+    // Only if authorized in ITFormsEmpMast, proceed to authenticate with LDAP
     let userDN;
     try {
       try {
-        userDN = await ldapAuthenticate(username, password);
+        userDN = await ldapAuthenticate(rawUsername, password);
       } catch (errDirect) {
         // fallback to search-then-bind if direct binds fail or server doesn't allow them
         try {
-          userDN = await ldapSearchThenBind(username, password);
+          userDN = await ldapSearchThenBind(rawUsername, password);
         } catch (errSearch) {
           // prefer the more specific message if available
           const msg = errSearch?.message || errDirect?.message || 'Invalid username or password';
@@ -224,11 +272,15 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Server misconfiguration: JWT secret not set' }, { status: 500 });
     }
 
+    const displayName = empRecord.EmpName?.trim() || empRecord.EmpCode;
+
     const secret = new TextEncoder().encode(jwtSecret);
     const token = await new jose.SignJWT({
       id: userDN,
-      username,
-      name: username,
+      username: empRecord.EmpCode,
+      name: displayName,
+      empCode: empRecord.EmpCode,
+      empName: displayName,
     })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
@@ -236,7 +288,11 @@ export async function POST(request) {
       .sign(secret);
 
     const response = NextResponse.json(
-      { message: 'Logged in successfully', username },
+      {
+        message: 'Logged in successfully',
+        username: empRecord.EmpCode,
+        empName: displayName,
+      },
       { status: 200 }
     );
 

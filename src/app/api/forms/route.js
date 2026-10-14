@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getITFormsPool, sql } from "@/lib/itFormsDb";
+import prisma from "@/lib/prisma";
 
 function formatBytes(bytes) {
   if (!bytes || bytes === 0) return "0 B";
@@ -9,17 +9,26 @@ function formatBytes(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 }
 
-// GET /api/forms -> Fetch all uploaded forms from ITForms database
+// GET /api/forms -> Fetch all uploaded forms from ITForms database (10.40.10.125) via Prisma
 export async function GET() {
   try {
-    const pool = await getITFormsPool();
-    const result = await pool.request().query(`
-      SELECT Id, Description, FileName, FileType, FileSize, FileSizeFormatted, UploadedBy, UploadedAt
-      FROM UploadedForms
-      ORDER BY UploadedAt DESC
-    `);
+    const records = await prisma.uploadedForms.findMany({
+      select: {
+        Id: true,
+        Description: true,
+        FileName: true,
+        FileType: true,
+        FileSize: true,
+        FileSizeFormatted: true,
+        UploadedBy: true,
+        UploadedAt: true,
+      },
+      orderBy: {
+        UploadedAt: "desc",
+      },
+    });
 
-    const forms = (result.recordset || []).map((row) => ({
+    const forms = records.map((row) => ({
       id: row.Id,
       description: row.Description,
       fileName: row.FileName,
@@ -34,12 +43,12 @@ export async function GET() {
 
     return NextResponse.json({ success: true, forms });
   } catch (err) {
-    console.error("Error fetching forms from ITForms DB:", err);
+    console.error("Error fetching forms from ITForms DB via Prisma:", err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
 
-// POST /api/forms -> Save new uploaded form into ITForms database
+// POST /api/forms -> Save new uploaded form into ITForms database (10.40.10.125) via Prisma
 export async function POST(req) {
   try {
     const formData = await req.formData();
@@ -68,35 +77,40 @@ export async function POST(req) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    // 50KB limit (with small tolerance up to 52,000 bytes)
-    const MAX_BYTES = 52000;
+    // 500KB limit (with small tolerance up to 52,000 bytes)
+    const MAX_BYTES = 520000;
     if (buffer.length > MAX_BYTES) {
       return NextResponse.json(
         {
           success: false,
-          error: `File size is ${formatBytes(buffer.length)}, which exceeds the 50 KB limit. Please compress the file before uploading.`,
+          error: `File size is ${formatBytes(buffer.length)}, which exceeds the 500 KB limit. Please compress the file before uploading.`,
         },
         { status: 400 }
       );
     }
 
-    const pool = await getITFormsPool();
-    const result = await pool
-      .request()
-      .input("Description", sql.NVarChar(500), description)
-      .input("FileName", sql.NVarChar(255), file.name)
-      .input("FileType", sql.NVarChar(100), isPdf ? "application/pdf" : (file.type || "image/jpeg"))
-      .input("FileSize", sql.Int, buffer.length)
-      .input("FileSizeFormatted", sql.NVarChar(50), formatBytes(buffer.length))
-      .input("FileData", sql.VarBinary(sql.MAX), buffer)
-      .input("UploadedBy", sql.NVarChar(100), uploadedBy)
-      .query(`
-        INSERT INTO UploadedForms (Description, FileName, FileType, FileSize, FileSizeFormatted, FileData, UploadedBy, UploadedAt)
-        OUTPUT INSERTED.Id, INSERTED.Description, INSERTED.FileName, INSERTED.FileType, INSERTED.FileSize, INSERTED.FileSizeFormatted, INSERTED.UploadedBy, INSERTED.UploadedAt
-        VALUES (@Description, @FileName, @FileType, @FileSize, @FileSizeFormatted, @FileData, @UploadedBy, GETDATE())
-      `);
+    const inserted = await prisma.uploadedForms.create({
+      data: {
+        Description: description,
+        FileName: file.name,
+        FileType: isPdf ? "application/pdf" : (file.type || "image/jpeg"),
+        FileSize: buffer.length,
+        FileSizeFormatted: formatBytes(buffer.length),
+        FileData: buffer,
+        UploadedBy: uploadedBy,
+      },
+      select: {
+        Id: true,
+        Description: true,
+        FileName: true,
+        FileType: true,
+        FileSize: true,
+        FileSizeFormatted: true,
+        UploadedBy: true,
+        UploadedAt: true,
+      },
+    });
 
-    const inserted = result.recordset[0];
     const formEntry = {
       id: inserted.Id,
       description: inserted.Description,
@@ -112,12 +126,12 @@ export async function POST(req) {
 
     return NextResponse.json({ success: true, form: formEntry });
   } catch (err) {
-    console.error("Error inserting form into ITForms DB:", err);
+    console.error("Error inserting form into ITForms DB via Prisma:", err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
 
-// DELETE /api/forms?id=... -> Delete form from ITForms database
+// DELETE /api/forms?id=... -> Delete form from ITForms database via Prisma
 export async function DELETE(req) {
   try {
     const { searchParams } = new URL(req.url);
@@ -127,15 +141,20 @@ export async function DELETE(req) {
       return NextResponse.json({ success: false, error: "Form ID is required." }, { status: 400 });
     }
 
-    const pool = await getITFormsPool();
-    await pool
-      .request()
-      .input("Id", sql.Int, parseInt(id, 10))
-      .query("DELETE FROM UploadedForms WHERE Id = @Id");
+    try {
+      await prisma.uploadedForms.delete({
+        where: { Id: parseInt(id, 10) },
+      });
+    } catch (err) {
+      // If record is already deleted or not found in DB (Prisma P2025), treat as success
+      if (err.code !== "P2025") {
+        throw err;
+      }
+    }
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("Error deleting form from ITForms DB:", err);
+    console.error("Error deleting form from ITForms DB via Prisma:", err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }

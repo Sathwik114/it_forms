@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { compressImageTo50Kb, formatFileSize } from "./compressImage";
+import { autoCompressFile, formatFileSize } from "./compressImage";
 
 export default function UploadForms({ onUploadSuccess, onCancel, empName = "Member" }) {
   const [description, setDescription] = useState("");
@@ -10,6 +10,7 @@ export default function UploadForms({ onUploadSuccess, onCancel, empName = "Memb
   const [processedFile, setProcessedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [isCompressing, setIsCompressing] = useState(false);
+  const [compressionStatus, setCompressionStatus] = useState("");
   const [stats, setStats] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -25,6 +26,7 @@ export default function UploadForms({ onUploadSuccess, onCancel, empName = "Memb
     }
     setStats(null);
     setErrorMsg("");
+    setCompressionStatus("");
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -38,8 +40,9 @@ export default function UploadForms({ onUploadSuccess, onCancel, empName = "Memb
     setSuccessMsg("");
     setSelectedFile(file);
 
-    const isImage = file.type.startsWith("image/");
-    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    const mime = file.type || "";
+    const isImage = mime.startsWith("image/");
+    const isPdf = mime === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
 
     if (!isImage && !isPdf) {
       setErrorMsg("Invalid file type. Only images (JPG, PNG, WEBP) and PDF files are allowed.");
@@ -47,46 +50,47 @@ export default function UploadForms({ onUploadSuccess, onCancel, empName = "Memb
       return;
     }
 
-    if (isImage) {
-      setIsCompressing(true);
-      try {
-        const result = await compressImageTo50Kb(file);
-        setProcessedFile(result.file);
-        setPreviewUrl(result.previewUrl);
-        setStats({
-          isImage: true,
-          originalSize: result.originalSize,
-          compressedSize: result.compressedSize,
-          ratio: result.ratio,
-        });
-      } catch (err) {
-        console.error("Compression error:", err);
-        setErrorMsg("Failed to compress image. Please try another image file.");
-      } finally {
-        setIsCompressing(false);
-      }
-    } else if (isPdf) {
-      const maxPdfBytes = 51200; // 50 KB
-      if (file.size > maxPdfBytes) {
-        setErrorMsg(
-          `PDF size is ${formatFileSize(file.size)}, which exceeds the 50 KB limit. Please upload a PDF under 50 KB, or upload as a photo/image (images are automatically compressed to under 50 KB).`
-        );
-        setProcessedFile(null);
-        setStats({
-          isImage: false,
-          originalSize: file.size,
-          compressedSize: file.size,
-          tooLarge: true,
-        });
-      } else {
-        setProcessedFile(file);
-        setStats({
-          isImage: false,
-          originalSize: file.size,
-          compressedSize: file.size,
-          tooLarge: false,
-        });
-      }
+    const needsCompression = file.size > 490 * 1024;
+    setIsCompressing(needsCompression);
+    if (needsCompression) {
+      setCompressionStatus(
+        isPdf
+          ? `Optimizing PDF (${formatFileSize(file.size)}) to under 500 KB with crystal-clear letter clarity...`
+          : `Optimizing image (${formatFileSize(file.size)}) to under 500 KB with sharp clarity...`
+      );
+    }
+
+    try {
+      const result = await autoCompressFile(file, (progress) => {
+        if (isPdf) {
+          setCompressionStatus(
+            `Enhancing & compressing PDF (${formatFileSize(file.size)}) • Pass ${progress.pass} of ${progress.totalPasses}...`
+          );
+        } else {
+          setCompressionStatus(
+            `Enhancing & compressing image (${formatFileSize(file.size)}) • Pass ${progress.pass}...`
+          );
+        }
+      });
+
+      setProcessedFile(result.file);
+      setPreviewUrl(result.previewUrl);
+      setStats({
+        isImage: result.isImage,
+        isPdf: result.isPdf,
+        originalSize: result.originalSize,
+        compressedSize: result.compressedSize,
+        ratio: result.ratio,
+        originalPreserved: result.originalPreserved || result.originalSize <= 490 * 1024,
+        tooLarge: result.compressedSize > 520000,
+      });
+    } catch (err) {
+      console.error("Compression error:", err);
+      setErrorMsg(err.message || "Failed to process file. Please try another file.");
+      setProcessedFile(null);
+    } finally {
+      setIsCompressing(false);
+      setCompressionStatus("");
     }
   };
 
@@ -101,12 +105,12 @@ export default function UploadForms({ onUploadSuccess, onCancel, empName = "Memb
     }
 
     if (!processedFile) {
-      setErrorMsg("Please select and compress a valid image or PDF under 50 KB.");
+      setErrorMsg("Please select a valid image or PDF under 500 KB.");
       return;
     }
 
-    if (processedFile.size > 52000) {
-      setErrorMsg(`File size (${formatFileSize(processedFile.size)}) exceeds the 50 KB limit.`);
+    if (processedFile.size > 520000) {
+      setErrorMsg(`File size (${formatFileSize(processedFile.size)}) exceeds the 500 KB limit.`);
       return;
     }
 
@@ -168,7 +172,7 @@ export default function UploadForms({ onUploadSuccess, onCancel, empName = "Memb
                 Upload Form
               </h2>
               <span style={{ fontSize: "12px", color: "#64748b" }}>
-                Images &amp; PDFs only • Automatically compressed to ≤ 50 KB
+                Images &amp; PDFs • Up to 500 KB with 100% letter clarity
               </span>
             </div>
           </div>
@@ -286,12 +290,12 @@ export default function UploadForms({ onUploadSuccess, onCancel, empName = "Memb
                 style={{ display: "none" }}
               />
 
-              <div style={{ fontSize: "36px", marginBottom: "8px" }}>📄</div>
+              <div style={{ fontSize: "36px", marginBottom: "8px" }}>📁</div>
               <div style={{ fontSize: "14px", fontWeight: "600", color: "#1e293b", marginBottom: "4px" }}>
                 {selectedFile ? selectedFile.name : "Click to select an Image or PDF file"}
               </div>
               <div style={{ fontSize: "12px", color: "#64748b" }}>
-                Accepted: JPG, PNG, WEBP, PDF • Target size: Under 50 KB
+                Accepted: JPG, PNG, WEBP, PDF • Up to 500 KB (100% original sharpness preserved)
               </div>
             </div>
           </div>
@@ -311,8 +315,13 @@ export default function UploadForms({ onUploadSuccess, onCancel, empName = "Memb
                 color: "#0369a1",
               }}
             >
-              <span>⏳</span>
-              <span>Compressing image to under 50 KB...</span>
+              <span style={{ fontSize: "18px" }}>⏳</span>
+              <div>
+                <div style={{ fontWeight: "600" }}>{compressionStatus || "Optimizing file to < 500 KB..."}</div>
+                <div style={{ fontSize: "11.5px", color: "#0284c7" }}>
+                  Preserving ultra-high resolution and crystal-clear letter readability...
+                </div>
+              </div>
             </div>
           )}
 
@@ -331,7 +340,7 @@ export default function UploadForms({ onUploadSuccess, onCancel, empName = "Memb
             >
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
                 <span style={{ fontSize: "13px", fontWeight: "600", color: "#334155" }}>
-                  File Size Summary:
+                  {stats.isPdf ? "📄 PDF File Summary:" : "🖼️ Image File Summary:"}
                 </span>
                 <span
                   style={{
@@ -343,7 +352,11 @@ export default function UploadForms({ onUploadSuccess, onCancel, empName = "Memb
                     color: stats.tooLarge ? "#991b1b" : "#166534",
                   }}
                 >
-                  {stats.tooLarge ? "❌ Exceeds 50 KB" : "✅ Under 50 KB Target"}
+                  {stats.tooLarge
+                    ? "❌ Exceeds 500 KB"
+                    : stats.originalPreserved
+                    ? "✅ 100% Original Vector Clarity (< 500 KB)"
+                    : "✅ Optimized Sharp (< 500 KB)"}
                 </span>
               </div>
 
@@ -352,32 +365,51 @@ export default function UploadForms({ onUploadSuccess, onCancel, empName = "Memb
                   Original: <strong>{formatFileSize(stats.originalSize)}</strong>
                 </div>
                 <div>
-                  Resulting: <strong>{formatFileSize(stats.compressedSize)}</strong>
+                  Resulting: <strong style={{ color: "#0f172a" }}>{formatFileSize(stats.compressedSize)}</strong>
                 </div>
                 {stats.ratio > 0 && (
                   <div style={{ color: "#16a34a", fontWeight: "600" }}>
                     Reduced by {stats.ratio}%
                   </div>
                 )}
+                {stats.originalPreserved && (
+                  <div style={{ color: "#0284c7", fontWeight: "600" }}>
+                    ✨ Pure original quality (Zero compression loss)
+                  </div>
+                )}
               </div>
 
-              {/* Preview Thumbnail for Image */}
+              {/* Preview Thumbnail for Image or PDF */}
               {previewUrl && (
                 <div style={{ marginTop: "6px" }}>
-                  <div style={{ fontSize: "12px", fontWeight: "600", color: "#475569", marginBottom: "4px" }}>
-                    Compressed Preview:
+                  <div style={{ fontSize: "12px", fontWeight: "600", color: "#475569", marginBottom: "6px" }}>
+                    Document Preview:
                   </div>
-                  <img
-                    src={previewUrl}
-                    alt="Preview"
-                    style={{
-                      maxHeight: "180px",
-                      maxWidth: "100%",
-                      borderRadius: "6px",
-                      border: "1px solid #cbd5e1",
-                      objectFit: "contain",
-                    }}
-                  />
+                  {stats.isPdf ? (
+                    <iframe
+                      src={previewUrl}
+                      title="PDF Preview"
+                      style={{
+                        width: "100%",
+                        height: "280px",
+                        borderRadius: "6px",
+                        border: "1px solid #cbd5e1",
+                        background: "#ffffff",
+                      }}
+                    />
+                  ) : (
+                    <img
+                      src={previewUrl}
+                      alt="Preview"
+                      style={{
+                        maxHeight: "240px",
+                        maxWidth: "100%",
+                        borderRadius: "6px",
+                        border: "1px solid #cbd5e1",
+                        objectFit: "contain",
+                      }}
+                    />
+                  )}
                 </div>
               )}
             </div>

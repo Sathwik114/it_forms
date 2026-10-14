@@ -20,6 +20,17 @@ You can start editing the page by modifying `app/page.js`. The page auto-updates
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Production server
+
+Build the project and start the production server on port 8005:
+
+```bash
+npm run build
+npm run start
+```
+
+The application will be available at [http://localhost:8005](http://localhost:8005). Configure the service manager to run `npm run start` from the project directory after the build has completed.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

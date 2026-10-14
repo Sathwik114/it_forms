@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getITFormsPool, sql } from "@/lib/itFormsDb";
+import prisma from "@/lib/prisma";
 
 export async function GET(req) {
   try {
@@ -11,18 +11,20 @@ export async function GET(req) {
       return NextResponse.json({ success: false, error: "Form ID is required" }, { status: 400 });
     }
 
-    const pool = await getITFormsPool();
-    const result = await pool
-      .request()
-      .input("Id", sql.Int, parseInt(id, 10))
-      .query("SELECT FileName, FileType, FileData FROM UploadedForms WHERE Id = @Id");
+    const row = await prisma.uploadedForms.findUnique({
+      where: { Id: parseInt(id, 10) },
+      select: {
+        FileName: true,
+        FileType: true,
+        FileData: true,
+      },
+    });
 
-    if (!result.recordset || result.recordset.length === 0) {
+    if (!row || !row.FileData) {
       return NextResponse.json({ success: false, error: "File not found" }, { status: 404 });
     }
 
-    const row = result.recordset[0];
-    const buffer = row.FileData;
+    const buffer = Buffer.from(row.FileData);
     const contentType = row.FileType || "application/octet-stream";
     const disposition = download ? `attachment; filename="${encodeURIComponent(row.FileName)}"` : "inline";
 
@@ -36,7 +38,7 @@ export async function GET(req) {
       },
     });
   } catch (err) {
-    console.error("Error serving file from ITForms DB:", err);
+    console.error("Error serving file via Prisma:", err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }

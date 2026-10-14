@@ -6,25 +6,25 @@ import { FORM_OPTIONS } from "../MaintenanceCheckList/MaintenanceCheckList";
 
 // Rows are filled up to "Status". The inspection columns stay blank for handwriting.
 const SERVERS = [
-  { name: "SR550-01", type: "Host (Server)", brand: "Lenovo", usage: "FP10 Infor Server", status: "Active" },
-  { name: "SR550-02", type: "Host (Server)", brand: "Lenovo", usage: "FP10 Infor Server", status: "Active" },
-  { name: "SR550-03", type: "Host (Server)", brand: "Lenovo", usage: "VMWare Server", status: "Active" },
-  { name: "X3650 M5-01", type: "Host (Server)", brand: "Lenovo", usage: "VMWare Server", status: "Active" },
-  { name: "X3650 M5-02", type: "Host (Server)", brand: "Lenovo", usage: "VMWare Server", status: "Active" },
   { name: "V3700 V2-01", type: "System Storage", brand: "Lenovo", usage: "FP10 Infor Storage", status: "Active" },
   { name: "V3700 V2-02", type: "System Storage", brand: "Lenovo", usage: "VMWare Storage", status: "Active" },
-  { name: "V3700 V2-02", type: "System Storage", brand: "Lenovo", usage: "VMWare Storage", status: "Repair" },
-  { name: "X3850 M2-01", type: "Host (Server)", brand: "IBM", usage: "IT Web Server", status: "Active" },
-  { name: "Power 740-01", type: "Host (Server)", brand: "IBM", usage: "FP5 Infor Server", status: "Active" },
-  { name: "Power 740-02", type: "Host (Server)", brand: "IBM", usage: "FP5 Infor Server", status: "Repair" },
-  { name: "DS5020-01", type: "System Storage", brand: "IBM", usage: "FP5 Infor Storage", status: "Active" },
+  { name: "X3650 M5-01", type: "Host (Server)", brand: "Lenovo", usage: "VMWare Server", status: "Active" },
+  { name: "X3650 M5-02", type: "Host (Server)", brand: "Lenovo", usage: "VMWare Server", status: "Active" },
+  { name: "SR550-01", type: "Host (Server)", brand: "Lenovo", usage: "FP10 Infor Server", status: "Active" },
+  { name: "Inspur-01", type: "System", brand: "Inspur", usage: "Main File Server", status: "Active" },
   { name: "DS5300-01", type: "System Storage", brand: "IBM", usage: "FP5 Infor Storage", status: "Active" },
   { name: "EXP5000-01", type: "System Storage", brand: "IBM", usage: "FP5 Infor Extend Storage", status: "Active" },
+  { name: "X3850 M2-01", type: "Host (Server)", brand: "IBM", usage: "IT Web Server", status: "Active" },
+  { name: "V3700 V2-02", type: "System Storage", brand: "Lenovo", usage: "VMWare Storage", status: "Inactive" },
+  { name: "SR550-02", type: "Host (Server)", brand: "Lenovo", usage: "FP10 Infor Server", status: "Active" },
+  { name: "SR550-03", type: "Host (Server)", brand: "Lenovo", usage: "VMWare Server", status: "Active" },
+  { name: "Power 740-01", type: "Host (Server)", brand: "IBM", usage: "FP5 Infor Server", status: "Active" },
+  { name: "Power 740-02", type: "Host (Server)", brand: "IBM", usage: "FP5 Infor Server", status: "Inactive" },
+  { name: "DS5020-01", type: "System Storage", brand: "IBM", usage: "FP5 Infor Storage", status: "Active" },
   { name: "X3850 X5-01", type: "Host (Server)", brand: "IBM", usage: "Dns Server2", status: "Active" },
   { name: "X3850 X5-02", type: "Host (Server)", brand: "IBM", usage: "Backup File Server", status: "Active" },
   { name: "V5000-01", type: "Storwize", brand: "IBM", usage: "Backup File Server Storage", status: "Active" },
-  { name: "Inspur-01", type: "System", brand: "Inspur", usage: "Main File Server", status: "Active" },
-  { name: "Inspur-02", type: "System", brand: "Inspur", usage: "Backup File Server", status: "Repair" },
+  { name: "Inspur-02", type: "System", brand: "Inspur", usage: "Backup File Server", status: "Inactive" },
 ];
 
 const INFO_HEADS = ["S.No", "Server / Device", "Type", "Brand", "Usage", "Status"];
@@ -37,9 +37,9 @@ const TOTAL_COLS = INFO_HEADS.length + CHECK_HEADS.length + END_HEADS.length;
 
 // Column widths (% of table). Total = 100.
 const COL_WIDTHS = [
-  2.8, 7.0, 8.2, 4.0, 9.2, 3.8,                    // S.No .. Status (Type is 8.2% so System Storage stays in single line)
+  2.8, 7.0, 8.2, 4.0, 9.0, 5.2,                    // S.No .. Status (Type is 8.2%, Status is 5.2% so Active & Repair fit without cut off)
   3.4, 3.4, 3.2, 3.4, 3.4, 3.8, 5.4, 3.2, 4.2, 4.4, 4.4, // Front LED .. Overall Status
-  7.8, 8.3, 6.7,                                   // Remarks, Checked By, Date
+  7.2, 7.7, 6.7,                                   // Remarks, Checked By, Date
 ];
 
 const MONTHS = [
@@ -69,9 +69,150 @@ const css = `
   .chk-table tbody td { height: 38px; font-size: 13px; }
   .chk-table .nowrap { white-space: nowrap; padding-left: 1px; padding-right: 1px; }
   .chk-table td.left { text-align: left; padding-left: 4px; }
-  .chk-table input { width: 100%; height: 100%; box-sizing: border-box; border: 0; background: transparent; padding: 2px; font: inherit; font-size: 13px; text-align: center; outline: none; }
+  .chk-table input { width: 100%; height: 100%; box-sizing: border-box; border: 0; background: transparent; padding: 0 1px; font: inherit; font-size: 11px; text-align: center; outline: none; }
   .chk-table input:focus { background: #eef5ff; }
+  .status-print { display: none; }
+  .status-input { display: block; width: 100%; height: 100%; }
   .chk-table tr.chk-meta td { background: #fff; height: 24px; font-weight: 700; text-align: left; padding-left: 4px; font-size: 12px; }
+
+  /* Excel-like selection styling for inspection cells */
+  .chk-cell {
+    cursor: cell;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: background-color 0.1s ease;
+    text-align: center;
+    vertical-align: middle;
+    padding: 1px 2px !important;
+  }
+  .chk-cell:hover {
+    background-color: #f1f5f9;
+  }
+  .chk-cell.selected-cell {
+    background-color: #bfdbfe !important;
+    box-shadow: inset 0 0 0 2px #2563eb !important;
+  }
+  .chk-val {
+    font-size: 11px;
+    font-weight: 700;
+    color: #000;
+    line-height: 1.1;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .chk-val.val-ok { color: #15803d; }
+  .chk-val.val-repair { color: #b91c1c; }
+  .chk-table th.chk-selectable-head {
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.15s ease;
+  }
+  .chk-table th.chk-selectable-head:hover {
+    background-color: #bfdbfe !important;
+    color: #1e3a8a;
+  }
+
+  /* Popup Modal Styles */
+  .chk-popup-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(15, 23, 42, 0.45);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+  }
+  .chk-popup-card {
+    background: #ffffff;
+    border-radius: 10px;
+    width: 100%;
+    max-width: 440px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    border: 1px solid #cbd5e1;
+    padding: 18px 22px;
+    box-sizing: border-box;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+  .chk-popup-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 10px;
+  }
+  .chk-badge-count {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 9999px;
+    background: #e0f2fe;
+    color: #0369a1;
+  }
+  .chk-presets-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .chk-popup-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 12px;
+    font-size: 13.5px;
+    font-weight: 600;
+    border: 1.5px solid #0284c7;
+    border-radius: 6px;
+    outline: none;
+    background: #f8fafc;
+  }
+  .chk-popup-input:focus {
+    background: #ffffff;
+    box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+  }
+  .chk-popup-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 16px;
+  }
+  .chk-btn-more {
+    font-size: 12px;
+    font-weight: 600;
+    color: #0369a1;
+    background: #f0f9ff;
+    border: 1px dashed #7dd3fc;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .chk-btn-cancel {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #475569;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    padding: 7px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .chk-btn-apply {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #ffffff;
+    background: #0284c7;
+    border: none;
+    padding: 7px 18px;
+    border-radius: 6px;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  }
+  .chk-btn-apply:hover {
+    background: #0369a1;
+  }
 
   .chk-footer { text-align: center; font-size: 13px; font-weight: 700; margin-top: 10px; }
 
@@ -85,6 +226,11 @@ const css = `
     .chk-table { width: 100% !important; font-size: 9.5px; }
     .chk-table thead tr.chk-heads th { font-size: 10.5px !important; }
     .chk-table tbody td { height: 8.7mm !important; font-size: 11px !important; }
+    .chk-table input, .status-input { display: none !important; }
+    .status-print { display: block !important; font-size: 11px !important; text-align: center !important; }
+    .chk-cell { cursor: default !important; }
+    .chk-cell.selected-cell { background-color: transparent !important; box-shadow: none !important; }
+    .chk-popup-overlay { display: none !important; }
     .chk-table tr { break-inside: avoid; }
     .chk-footer { font-size: 11px; margin-top: 4mm; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -103,6 +249,152 @@ export default function ServerInspectionChecklist({
   const [downloading, setDownloading] = useState(false);
   const [statuses, setStatuses] = useState(() => SERVERS.map((s) => s.status));
 
+  // Inspection check boxes state: key = `${rowIdx}_${colIdx}`
+  const [checkValues, setCheckValues] = useState({});
+  const [selectedCells, setSelectedCells] = useState(() => new Set());
+  const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const [fillValue, setFillValue] = useState("OK");
+
+  const isSelectingRef = useRef(false);
+  const startCellRef = useRef({ row: 0, col: 0 });
+  const baseSelectionRef = useRef(new Set());
+  const popupInputRef = useRef(null);
+
+  // Global mouseup listener to open popup on left-click release after selection
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (isSelectingRef.current) {
+        isSelectingRef.current = false;
+        setSelectedCells((current) => {
+          if (current.size > 0) {
+            setIsPopupOpen(true);
+          }
+          return current;
+        });
+      }
+    };
+
+    window.addEventListener("mouseup", handleGlobalMouseUp);
+    return () => {
+      window.removeEventListener("mouseup", handleGlobalMouseUp);
+    };
+  }, []);
+
+  // Autofocus input in popup
+  useEffect(() => {
+    if (isPopupOpen) {
+      const timer = setTimeout(() => {
+        if (popupInputRef.current) {
+          popupInputRef.current.focus();
+          popupInputRef.current.select();
+        }
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isPopupOpen]);
+
+  const handleCellMouseDown = (row, col, e) => {
+    if (e.button !== 0) return; // Left click only
+    e.preventDefault();
+  
+    const key = `${row}_${col}`;
+    isSelectingRef.current = true;
+    startCellRef.current = { row, col };
+
+    if (e.ctrlKey || e.metaKey) {
+      setSelectedCells((prev) => {
+        const next = new Set(prev);
+        if (next.has(key)) {
+          next.delete(key);
+        } else {
+          next.add(key);
+        }
+        baseSelectionRef.current = next;
+        return next;
+      });
+    } else {
+      const next = new Set([key]);
+      baseSelectionRef.current = new Set();
+      setSelectedCells(next);
+    }
+  };
+
+  const handleCellMouseEnter = (row, col) => {
+    if (!isSelectingRef.current) return;
+
+    const minRow = Math.min(startCellRef.current.row, row);
+    const maxRow = Math.max(startCellRef.current.row, row);
+    const minCol = Math.min(startCellRef.current.col, col);
+    const maxCol = Math.max(startCellRef.current.col, col);
+
+    const next = new Set(baseSelectionRef.current);
+    for (let r = minRow; r <= maxRow; r++) {
+      for (let c = minCol; c <= maxCol; c++) {
+        next.add(`${r}_${c}`);
+      }
+    }
+    setSelectedCells(next);
+  };
+
+  const handleApplyFill = (valueToApply = fillValue) => {
+    const val = (valueToApply ?? "").trim();
+    setCheckValues((prev) => {
+      const next = { ...prev };
+      selectedCells.forEach((key) => {
+        if (val) {
+          next[key] = val;
+        } else {
+          delete next[key];
+        }
+      });
+      return next;
+    });
+    setIsPopupOpen(false);
+    setSelectedCells(new Set());
+  };
+
+  const handleCancelPopup = () => {
+    setIsPopupOpen(false);
+    setSelectedCells(new Set());
+  };
+
+  const handleSelectMore = () => {
+    setIsPopupOpen(false);
+  };
+
+  const handleSelectColumn = (colIdx) => {
+    const next = new Set();
+    for (let r = 0; r < SERVERS.length; r++) {
+      next.add(`${r}_${colIdx}`);
+    }
+    setSelectedCells(next);
+    setIsPopupOpen(true);
+  };
+
+  const handleFillAllOk = () => {
+    const next = {};
+    for (let r = 0; r < SERVERS.length; r++) {
+      for (let c = 0; c < CHECK_HEADS.length; c++) {
+        next[`${r}_${c}`] = "OK";
+      }
+    }
+    setCheckValues(next);
+  };
+
+  const handleReset = () => {
+    const count = Object.keys(checkValues).length;
+    if (count > 0 || statuses.some((st, i) => st !== SERVERS[i].status)) {
+      if (!window.confirm("Are you sure you want to reset all checklist values, server statuses, and date to original form?")) {
+        return;
+      }
+    }
+    setCheckValues({});
+    setStatuses(SERVERS.map((s) => s.status));
+    setToday();
+    setSelectedCells(new Set());
+    setIsPopupOpen(false);
+  };
+
   const handleStatusChange = (index, value) => {
     setStatuses((prev) => {
       const next = [...prev];
@@ -119,7 +411,6 @@ export default function ServerInspectionChecklist({
     setDay(now.getDate());
   };
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(setToday, []);
 
   const years = useMemo(() => {
@@ -208,12 +499,35 @@ export default function ServerInspectionChecklist({
             disabled={year === null}
           >
             {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((d) => (
+              
               <option key={d} value={d}>{d}</option>
             ))}
           </select>
         </label>
 
-        <button type="button" className="secondary" onClick={setToday}>Today</button>
+        <button
+          type="button"
+          className="secondary"
+          onClick={handleFillAllOk}
+          title="Quickly fill all inspection boxes with 'OK'"
+        >
+          ⚡ Fill All &quot;OK&quot;
+        </button>
+        <button
+          type="button"
+          className="secondary"
+          onClick={handleReset}
+          style={{
+            borderColor: "#ef4444",
+            color: "#b91c1c",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "4px",
+          }}
+          title="Reset all inspection check values and server statuses to original form"
+        >
+          🔄 Reset Form
+        </button>
         <button type="button" onClick={() => window.print()}>Print</button>
         <button type="button" onClick={handleDownloadPdf} disabled={downloading} style={{ marginLeft: "auto" }}>
           {downloading ? "Downloading..." : "Download PDF"}
@@ -241,11 +555,21 @@ export default function ServerInspectionChecklist({
                 <td colSpan={TOTAL_COLS - 14}>Leader Sign:</td>
               </tr>
               <tr className="chk-heads">
-                {[...INFO_HEADS, ...CHECK_HEADS, ...END_HEADS].map((h) => (
-                  <th key={h} scope="col" className={NOWRAP_HEADS.includes(h) ? "nowrap" : undefined}>
-                    {h === "HDD/SSD" ? <>HDD/<wbr />SSD</> : h}
-                  </th>
-                ))}
+                {[...INFO_HEADS, ...CHECK_HEADS, ...END_HEADS].map((h, idx) => {
+                  const checkColIdx = idx - INFO_HEADS.length;
+                  const isCheckCol = checkColIdx >= 0 && checkColIdx < CHECK_HEADS.length;
+                  return (
+                    <th
+                      key={h}
+                      scope="col"
+                      className={`${NOWRAP_HEADS.includes(h) ? "nowrap" : ""} ${isCheckCol ? "chk-selectable-head" : ""}`}
+                      onClick={isCheckCol ? () => handleSelectColumn(checkColIdx) : undefined}
+                      title={isCheckCol ? `Click to select and fill all 19 servers for ${h}` : undefined}
+                    >
+                      {h === "HDD/SSD" ? <>HDD/<wbr />SSD</> : h}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
 
@@ -257,17 +581,34 @@ export default function ServerInspectionChecklist({
                   <td className="left nowrap">{s.type}</td>
                   <td>{s.brand}</td>
                   <td className="left">{s.usage}</td>
-                  <td>
+                  <td className="status-cell">
+                    <span className="status-print">{statuses[i] ?? s.status}</span>
                     <input
                       type="text"
-                      className="status-input"
+                      className="status-input no-print"
                       value={statuses[i] ?? s.status}
                       onChange={(e) => handleStatusChange(i, e.target.value)}
                     />
                   </td>
-                  {CHECK_HEADS.map((h) => (
-                    <td key={h}></td>
-                  ))}
+                  {CHECK_HEADS.map((h, colIdx) => {
+                    const key = `${i}_${colIdx}`;
+                    const val = checkValues[key] || "";
+                    const isSelected = selectedCells.has(key);
+                    const valLower = val.toLowerCase();
+                    return (
+                      <td
+                        key={h}
+                        className={`chk-cell ${isSelected ? "selected-cell" : ""}`}
+                        onMouseDown={(e) => handleCellMouseDown(i, colIdx, e)}
+                        onMouseEnter={() => handleCellMouseEnter(i, colIdx)}
+                        title={`Server ${s.name} - ${h}: ${val || "Empty (Ctrl+Click / Drag to select & fill)"}`}
+                      >
+                        <span className={`chk-val ${valLower === "ok" || valLower === "✓" ? "val-ok" : valLower === "repair" || valLower === "fault" ? "val-repair" : ""}`}>
+                          {val}
+                        </span>
+                      </td>
+                    );
+                  })}
                   <td></td>
                   <td></td>
                   <td className="nowrap">{dateText}</td>
@@ -279,6 +620,123 @@ export default function ServerInspectionChecklist({
 
         <div className="chk-footer">Greentech Industries(India) Pvt. Ltd.</div>
       </div>
+
+      {/* Excel-style Multi-Cell Fill Popup */}
+      {isPopupOpen && (
+        <div
+          className="chk-popup-overlay"
+          onClick={handleCancelPopup}
+        >
+          <div
+            className="chk-popup-card"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="chk-popup-header">
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "18px" }}>📋</span>
+                <span style={{ fontWeight: "700", fontSize: "16px", color: "#0f172a" }}>
+                  Fill Inspection Boxes
+                </span>
+              </div>
+              <span className="chk-badge-count">
+                {selectedCells.size} {selectedCells.size === 1 ? "box" : "boxes"} selected
+              </span>
+            </div>
+
+            <p style={{ margin: "8px 0 12px", fontSize: "12.5px", color: "#64748b" }}>
+              Enter a value or click a quick preset to fit into the selected boxes:
+            </p>
+
+            {/* Quick Presets */}
+            <div className="chk-presets-row">
+              {[
+                { label: "OK", color: "#166534", bg: "#dcfce7", border: "#bbf7d0" },
+                { label: "✓", color: "#15803d", bg: "#f0fdf4", border: "#86efac" },
+                { label: "Normal", color: "#0369a1", bg: "#e0f2fe", border: "#bae6fd" },
+                { label: "Good", color: "#334155", bg: "#f1f5f9", border: "#cbd5e1" },
+                { label: "Active", color: "#1d4ed8", bg: "#eff6ff", border: "#bfdbfe" },
+                { label: "Repair", color: "#b45309", bg: "#fef3c7", border: "#fde68a" },
+                { label: "Fault", color: "#b91c1c", bg: "#fee2e2", border: "#fca5a5" },
+                { label: "N/A", color: "#475569", bg: "#f8fafc", border: "#e2e8f0" },
+                { label: "Clear", color: "#dc2626", bg: "#fff1f2", border: "#fecdd3" },
+              ].map((p) => (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() => {
+                    if (p.label === "Clear") {
+                      handleApplyFill("");
+                    } else {
+                      setFillValue(p.label);
+                      handleApplyFill(p.label);
+                    }
+                  }}
+                  style={{
+                    padding: "4px 10px",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    borderRadius: "5px",
+                    cursor: "pointer",
+                    color: p.color,
+                    background: p.bg,
+                    border: `1px solid ${p.border}`,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Custom Input */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleApplyFill();
+              }}
+              style={{ marginTop: "14px" }}
+            >
+              <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "#334155", marginBottom: "4px" }}>
+                Field Value:
+              </label>
+              <input
+                ref={popupInputRef}
+                type="text"
+                value={fillValue}
+                onChange={(e) => setFillValue(e.target.value)}
+                placeholder="Type value (e.g. OK, Normal, N/A)..."
+                className="chk-popup-input"
+              />
+
+              <div className="chk-popup-actions">
+                <button
+                  type="button"
+                  onClick={handleSelectMore}
+                  className="chk-btn-more"
+                  title="Keep selection and select more cells on the table"
+                >
+                  ➕ Select More
+                </button>
+                <div style={{ display: "flex", gap: "8px", marginLeft: "auto" }}>
+                  <button
+                    type="button"
+                    onClick={handleCancelPopup}
+                    className="chk-btn-cancel"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="chk-btn-apply"
+                  >
+                    OK (Fill)
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,7 +1,10 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+const PAGE_SIZE = 15;
+const COL_LINE = "1px solid #e2e8f0";
 
 export default function ViewForms({ onUploadNew, onBack }) {
   const [forms, setForms] = useState([]);
@@ -11,6 +14,8 @@ export default function ViewForms({ onUploadNew, onBack }) {
   const [previewItem, setPreviewItem] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [dateSortOrder, setDateSortOrder] = useState("desc"); // "desc" | "asc"
 
   const fetchForms = () => {
     setLoading(true);
@@ -25,6 +30,7 @@ export default function ViewForms({ onUploadNew, onBack }) {
         if (!isMounted) return;
         if (data.success) {
           setForms(data.forms || []);
+          setErrorMsg("");
         } else {
           setErrorMsg(data.error || "Failed to load forms from database.");
         }
@@ -69,14 +75,154 @@ export default function ViewForms({ onUploadNew, onBack }) {
     }
   };
 
-  const filteredForms = forms.filter((f) => {
+  // Dedicated Print handler for both PDF documents and images
+  const handlePrint = (item) => {
+    if (!item || !item.fileUrl) return;
+
+    const isPdf = item.fileType === "application/pdf" || (item.fileName || "").toLowerCase().endsWith(".pdf");
+    const fileUrl = item.fileUrl;
+
+    const iframeId = "print-iframe-hidden";
+    let iframe = document.getElementById(iframeId);
+    if (iframe) {
+      iframe.remove();
+    }
+
+    iframe = document.createElement("iframe");
+    iframe.id = iframeId;
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    document.body.appendChild(iframe);
+
+    if (isPdf) {
+      iframe.src = fileUrl;
+      iframe.onload = () => {
+        setTimeout(() => {
+          try {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+          } catch {
+            const win = window.open(fileUrl, "_blank");
+            win?.focus();
+            win?.print();
+          }
+        }, 500);
+      };
+    } else {
+      const doc = iframe.contentWindow?.document || iframe.contentDocument;
+      if (doc) {
+        doc.open();
+        doc.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>${item.description || item.fileName}</title>
+              <style>
+                @page { margin: 10mm; size: auto; }
+                body {
+                  margin: 0;
+                  display: flex;
+                  justify-content: center;
+                  align-items: center;
+                  background: #ffffff;
+                }
+                img {
+                  max-width: 100%;
+                  max-height: 98vh;
+                  object-fit: contain;
+                  display: block;
+                }
+              </style>
+            </head>
+            <body>
+              <img src="${fileUrl}" onload="window.focus(); window.print();" />
+            </body>
+          </html>
+        `);
+        doc.close();
+      } else {
+        const win = window.open(fileUrl, "_blank");
+        win?.focus();
+        win?.print();
+      }
+    }
+  };
+
+  const filteredForms = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    if (!q) return true;
-    return (
-      (f.description || "").toLowerCase().includes(q) ||
-      (f.fileName || "").toLowerCase().includes(q) ||
-      (f.uploadedBy || "").toLowerCase().includes(q)
-    );
+    const result = q
+      ? forms.filter(
+          (f) =>
+            (f.description || "").toLowerCase().includes(q) ||
+            (f.fileName || "").toLowerCase().includes(q) ||
+            (f.uploadedBy || "").toLowerCase().includes(q)
+        )
+      : [...forms];
+
+    // Strictly sort by Date & Time (descending by default) with Id tiebreaker
+    return result.sort((a, b) => {
+      const timeA = a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0;
+      const timeB = b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0;
+
+      if (dateSortOrder === "asc") {
+        if (timeA !== timeB) return timeA - timeB;
+        return (a.id || 0) - (b.id || 0);
+      } else {
+        // default: descending (newest date and time first)
+        if (timeB !== timeA) return timeB - timeA;
+        return (b.id || 0) - (a.id || 0);
+      }
+    });
+  }, [forms, searchQuery, dateSortOrder]);
+
+  /* ---------- Pagination ---------- */
+  const totalItems = filteredForms.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  const showPagination = totalItems > PAGE_SIZE;
+
+  // Always keep the page within range (e.g. after delete / search)
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const startIndex = (safePage - 1) * PAGE_SIZE;
+  const endIndex = Math.min(startIndex + PAGE_SIZE, totalItems);
+  const paginatedForms = filteredForms.slice(startIndex, endIndex);
+
+  const goToPage = (p) => {
+    const next = Math.min(Math.max(1, p), totalPages);
+    setCurrentPage(next);
+  };
+
+  // Builds [1, "...", 4, 5, 6, "...", 20]
+  const pageNumbers = useMemo(() => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    const pages = [1];
+    const left = Math.max(2, safePage - 1);
+    const right = Math.min(totalPages - 1, safePage + 1);
+    if (left > 2) pages.push("left-dots");
+    for (let i = left; i <= right; i++) pages.push(i);
+    if (right < totalPages - 1) pages.push("right-dots");
+    pages.push(totalPages);
+    return pages;
+  }, [totalPages, safePage]);
+
+  const pageBtnStyle = (active, disabled) => ({
+    minWidth: "34px",
+    height: "34px",
+    padding: "0 10px",
+    fontSize: "13px",
+    fontWeight: "600",
+    borderRadius: "6px",
+    border: active ? "1px solid #0284c7" : "1px solid #cbd5e1",
+    background: active ? "#0284c7" : "#ffffff",
+    color: active ? "#ffffff" : disabled ? "#94a3b8" : "#334155",
+    cursor: disabled ? "not-allowed" : "pointer",
+    opacity: disabled ? 0.6 : 1,
   });
 
   const formatDate = (isoString) => {
@@ -97,13 +243,15 @@ export default function ViewForms({ onUploadNew, onBack }) {
   };
 
   return (
-    <div style={{ width: "100%", maxWidth: "1280px", margin: "20px auto", padding: "0 16px", boxSizing: "border-box" }}>
-      {/* Top Bar */}
+    <div style={{ width: "100%", maxWidth: "100%", margin: "16px 0", padding: "0 24px", boxSizing: "border-box" }}>
+      {/* Top Bar - Full Width */}
       <div
         style={{
+          width: "100%",
+          boxSizing: "border-box",
           background: "#ffffff",
           borderRadius: "10px",
-          padding: "16px 20px",
+          padding: "16px 24px",
           boxShadow: "0 1px 4px rgba(0, 0, 0, 0.08)",
           border: "1px solid #e2e8f0",
           marginBottom: "16px",
@@ -135,7 +283,7 @@ export default function ViewForms({ onUploadNew, onBack }) {
               </span>
             </div>
             <span style={{ fontSize: "12px", color: "#64748b" }}>
-              Fetched directly from ITForms Database
+              Fetched directly from ITForms Database (10.40.10.125)
             </span>
           </div>
         </div>
@@ -145,14 +293,17 @@ export default function ViewForms({ onUploadNew, onBack }) {
             type="text"
             placeholder="🔍 Search forms..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
             style={{
               padding: "7px 12px",
               fontSize: "13px",
               border: "1px solid #cbd5e1",
               borderRadius: "6px",
               outline: "none",
-              minWidth: "220px",
+              minWidth: "240px",
               backgroundColor: "#f8fafc",
             }}
           />
@@ -236,9 +387,11 @@ export default function ViewForms({ onUploadNew, onBack }) {
         </div>
       )}
 
-      {/* Main Table Container */}
+      {/* Main Table Container - Full Width */}
       <div
         style={{
+          width: "100%",
+          boxSizing: "border-box",
           background: "#ffffff",
           borderRadius: "10px",
           border: "1px solid #e2e8f0",
@@ -250,9 +403,10 @@ export default function ViewForms({ onUploadNew, onBack }) {
           <table
             style={{
               width: "100%",
+              minWidth: "1150px",
               borderCollapse: "collapse",
               textAlign: "left",
-              fontSize: "13px",
+              fontSize: "12.5px",
               fontFamily: "Arial, sans-serif",
             }}
           >
@@ -265,20 +419,53 @@ export default function ViewForms({ onUploadNew, onBack }) {
                   fontWeight: "700",
                 }}
               >
-                <th style={{ padding: "12px 10px", width: "50px", textAlign: "center" }}>S.No</th>
-                <th style={{ padding: "12px 14px" }}>Description</th>
-                <th style={{ padding: "12px 14px" }}>File</th>
-                <th style={{ padding: "12px 12px", width: "90px", textAlign: "center" }}>Size</th>
-                <th style={{ padding: "12px 14px", width: "130px" }}>Uploaded By</th>
-                <th style={{ padding: "12px 14px", width: "170px" }}>Date &amp; Time</th>
-                <th style={{ padding: "12px 14px", width: "190px", textAlign: "center" }}>Actions</th>
+                <th style={{ padding: "8px 10px", borderRight: COL_LINE, width: "50px", textAlign: "center", whiteSpace: "nowrap" }}>S.No</th>
+                <th style={{ padding: "8px 14px", borderRight: COL_LINE, whiteSpace: "nowrap" }}>Description</th>
+                <th style={{ padding: "8px 14px", borderRight: COL_LINE, whiteSpace: "nowrap" }}>File</th>
+                <th style={{ padding: "8px 12px", borderRight: COL_LINE, width: "95px", textAlign: "center", whiteSpace: "nowrap" }}>Size</th>
+                <th style={{ padding: "8px 14px", borderRight: COL_LINE, width: "150px", whiteSpace: "nowrap" }}>Uploaded By</th>
+                <th
+                  onClick={() => {
+                    setDateSortOrder((prev) => (prev === "desc" ? "asc" : "desc"));
+                    setCurrentPage(1);
+                  }}
+                  style={{
+                    padding: "8px 14px",
+                    borderRight: COL_LINE,
+                    width: "185px",
+                    whiteSpace: "nowrap",
+                    cursor: "pointer",
+                    userSelect: "none",
+                  }}
+                  title={`Click to sort by Date & Time (Currently: ${dateSortOrder === "desc" ? "Descending / Newest first" : "Ascending / Oldest first"})`}
+                >
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                    <span>Date &amp; Time</span>
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: "700",
+                        padding: "1px 6px",
+                        borderRadius: "4px",
+                        backgroundColor: dateSortOrder === "desc" ? "#e0f2fe" : "#f1f5f9",
+                        color: dateSortOrder === "desc" ? "#0369a1" : "#475569",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "2px",
+                      }}
+                    >
+                      {dateSortOrder === "desc" ? "▼ Newest" : "▲ Oldest"}
+                    </span>
+                  </div>
+                </th>
+                <th style={{ padding: "8px 14px", width: "250px", textAlign: "center", borderRight: "none", whiteSpace: "nowrap" }}>Actions</th>
               </tr>
             </thead>
 
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={7} style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>
+                  <td colSpan={7} style={{ padding: "40px", textAlign: "center", color: "#64748b", whiteSpace: "nowrap" }}>
                     ⏳ Fetching forms from ITForms database...
                   </td>
                 </tr>
@@ -293,7 +480,7 @@ export default function ViewForms({ onUploadNew, onBack }) {
                     </div>
                     <div style={{ fontSize: "12.5px", color: "#64748b", marginBottom: "16px" }}>
                       {forms.length === 0
-                        ? "Click below to upload your first form (under 50 KB)."
+                        ? "Click below to upload your first form (under 500 KB)."
                         : `No records matched "${searchQuery}"`}
                     </div>
                     {forms.length === 0 && onUploadNew && (
@@ -319,42 +506,53 @@ export default function ViewForms({ onUploadNew, onBack }) {
               )}
 
               {!loading &&
-                filteredForms.map((item, idx) => {
+                paginatedForms.map((item, idx) => {
                   const isPdf = item.fileType === "application/pdf" || (item.fileName || "").toLowerCase().endsWith(".pdf");
 
                   return (
                     <tr
                       key={item.id}
                       style={{
-                        borderBottom: "1px solid #e2e8f0",
+                        borderBottom: "1px solid #cbd5e1",
                         transition: "background-color 0.15s ease",
                       }}
                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8fafc")}
                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#ffffff")}
                     >
-                      {/* S.No */}
-                      <td style={{ padding: "12px 10px", textAlign: "center", color: "#64748b", fontWeight: "600" }}>
-                        {idx + 1}
+                      {/* S.No - Single Line */}
+                      <td style={{ padding: "6px 10px", borderRight: COL_LINE, textAlign: "center", color: "#64748b", fontWeight: "600", whiteSpace: "nowrap" }}>
+                        {startIndex + idx + 1}
                       </td>
 
-                      {/* Description */}
-                      <td style={{ padding: "12px 14px", fontWeight: "600", color: "#0f172a", maxWidth: "300px" }}>
-                        <div style={{ lineHeight: 1.35 }}>{item.description}</div>
+                      {/* Description - Strictly Single Line */}
+                      <td style={{ padding: "6px 14px", borderRight: COL_LINE, fontWeight: "600", color: "#0f172a", whiteSpace: "nowrap" }}>
+                        <div
+                          title={item.description}
+                          style={{
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            maxWidth: "420px",
+                            lineHeight: 1.3,
+                          }}
+                        >
+                          {item.description}
+                        </div>
                       </td>
 
-                      {/* File */}
-                      <td style={{ padding: "12px 14px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <span style={{ fontSize: "18px" }}>{isPdf ? "📄" : "🖼️"}</span>
+                      {/* File - Strictly Single Line */}
+                      <td style={{ padding: "6px 14px", borderRight: COL_LINE, whiteSpace: "nowrap" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", whiteSpace: "nowrap" }}>
+                          <span style={{ fontSize: "15px", flexShrink: 0 }}>{isPdf ? "📄" : "🖼️"}</span>
                           <span
                             onClick={() => setPreviewItem(item)}
-                            title="Click to view file"
+                            title={`Click to view ${item.fileName}`}
                             style={{
                               color: "#0369a1",
                               fontWeight: "600",
                               cursor: "pointer",
                               textDecoration: "underline",
-                              maxWidth: "220px",
+                              maxWidth: "280px",
                               overflow: "hidden",
                               textOverflow: "ellipsis",
                               whiteSpace: "nowrap",
@@ -366,8 +564,8 @@ export default function ViewForms({ onUploadNew, onBack }) {
                         </div>
                       </td>
 
-                      {/* Size */}
-                      <td style={{ padding: "12px 12px", textAlign: "center" }}>
+                      {/* Size - Single Line */}
+                      <td style={{ padding: "6px 12px", borderRight: COL_LINE, textAlign: "center", whiteSpace: "nowrap" }}>
                         <span
                           style={{
                             fontSize: "11px",
@@ -377,30 +575,32 @@ export default function ViewForms({ onUploadNew, onBack }) {
                             background: "#dcfce7",
                             color: "#166534",
                             whiteSpace: "nowrap",
+                            display: "inline-block",
                           }}
                         >
                           {item.fileSizeFormatted}
                         </span>
                       </td>
 
-                      {/* Uploaded By */}
-                      <td style={{ padding: "12px 14px", color: "#334155", fontWeight: "500" }}>
+                      {/* Uploaded By - Strictly Single Line */}
+                      <td style={{ padding: "6px 14px", borderRight: COL_LINE, color: "#334155", fontWeight: "500", whiteSpace: "nowrap" }}>
                         {item.uploadedBy || "Member"}
                       </td>
 
-                      {/* Date & Time */}
-                      <td style={{ padding: "12px 14px", color: "#64748b", whiteSpace: "nowrap" }}>
+                      {/* Date & Time - Strictly Single Line */}
+                      <td style={{ padding: "6px 14px", borderRight: COL_LINE, color: "#64748b", whiteSpace: "nowrap" }}>
                         {formatDate(item.uploadedAt)}
                       </td>
 
-                      {/* Actions */}
-                      <td style={{ padding: "12px 14px", textAlign: "center" }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                      {/* Actions - Single Line with View, Print, Download, Delete */}
+                      <td style={{ padding: "6px 14px", textAlign: "center", borderRight: "none", whiteSpace: "nowrap" }}>
+                        <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "5px", whiteSpace: "nowrap" }}>
+                          {/* View Button */}
                           <button
                             type="button"
                             onClick={() => setPreviewItem(item)}
                             style={{
-                              padding: "5px 9px",
+                              padding: "4px 8px",
                               fontSize: "12px",
                               fontWeight: "600",
                               color: "#0369a1",
@@ -408,17 +608,42 @@ export default function ViewForms({ onUploadNew, onBack }) {
                               border: "1px solid #bae6fd",
                               borderRadius: "5px",
                               cursor: "pointer",
+                              whiteSpace: "nowrap",
                             }}
                             title="Preview File"
                           >
                             👁️ View
                           </button>
 
+                          {/* Print Button */}
+                          <button
+                            type="button"
+                            onClick={() => handlePrint(item)}
+                            style={{
+                              padding: "4px 8px",
+                              fontSize: "12px",
+                              fontWeight: "600",
+                              color: "#334155",
+                              background: "#f1f5f9",
+                              border: "1px solid #cbd5e1",
+                              borderRadius: "5px",
+                              cursor: "pointer",
+                              whiteSpace: "nowrap",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "3px",
+                            }}
+                            title="Print File"
+                          >
+                            🖨️ Print
+                          </button>
+
+                          {/* Download Button */}
                           <a
                             href={item.downloadUrl || item.fileUrl}
                             download={item.fileName}
                             style={{
-                              padding: "5px 9px",
+                              padding: "4px 8px",
                               fontSize: "12px",
                               fontWeight: "600",
                               color: "#166534",
@@ -427,24 +652,27 @@ export default function ViewForms({ onUploadNew, onBack }) {
                               borderRadius: "5px",
                               textDecoration: "none",
                               display: "inline-block",
+                              whiteSpace: "nowrap",
                             }}
                             title="Download File"
                           >
                             ⬇️ Download
                           </a>
 
+                          {/* Delete Button */}
                           <button
                             type="button"
                             onClick={() => handleDelete(item.id, item.description)}
                             disabled={deletingId === item.id}
                             style={{
-                              padding: "5px 8px",
+                              padding: "4px 7px",
                               fontSize: "12px",
                               color: "#b91c1c",
                               background: "#fef2f2",
                               border: "1px solid #fecaca",
                               borderRadius: "5px",
                               cursor: deletingId === item.id ? "not-allowed" : "pointer",
+                              whiteSpace: "nowrap",
                             }}
                             title="Delete Record"
                           >
@@ -458,6 +686,84 @@ export default function ViewForms({ onUploadNew, onBack }) {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Footer */}
+        {!loading && showPagination && (
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "12px",
+              padding: "12px 16px",
+              borderTop: "1px solid #e2e8f0",
+              background: "#f8fafc",
+            }}
+          >
+            <span style={{ fontSize: "12.5px", color: "#64748b" }}>
+              Showing <strong style={{ color: "#0f172a" }}>{startIndex + 1}</strong> to{" "}
+              <strong style={{ color: "#0f172a" }}>{endIndex}</strong> of{" "}
+              <strong style={{ color: "#0f172a" }}>{totalItems}</strong> records
+            </span>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={() => goToPage(1)}
+                disabled={safePage === 1}
+                title="First page"
+                style={pageBtnStyle(false, safePage === 1)}
+              >
+                «
+              </button>
+              <button
+                type="button"
+                onClick={() => goToPage(safePage - 1)}
+                disabled={safePage === 1}
+                style={pageBtnStyle(false, safePage === 1)}
+              >
+                ‹ Prev
+              </button>
+
+              {pageNumbers.map((p) =>
+                typeof p === "number" ? (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => goToPage(p)}
+                    aria-current={p === safePage ? "page" : undefined}
+                    style={pageBtnStyle(p === safePage, false)}
+                  >
+                    {p}
+                  </button>
+                ) : (
+                  <span key={p} style={{ padding: "0 4px", color: "#94a3b8", fontWeight: "700" }}>
+                    …
+                  </span>
+                )
+              )}
+
+              <button
+                type="button"
+                onClick={() => goToPage(safePage + 1)}
+                disabled={safePage === totalPages}
+                style={pageBtnStyle(false, safePage === totalPages)}
+              >
+                Next ›
+              </button>
+              <button
+                type="button"
+                onClick={() => goToPage(totalPages)}
+                disabled={safePage === totalPages}
+                title="Last page"
+                style={pageBtnStyle(false, safePage === totalPages)}
+              >
+                »
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modal Preview */}
@@ -483,9 +789,9 @@ export default function ViewForms({ onUploadNew, onBack }) {
             style={{
               backgroundColor: "#ffffff",
               borderRadius: "12px",
-              maxWidth: "850px",
+              maxWidth: "1050px",
               width: "100%",
-              maxHeight: "90vh",
+              maxHeight: "92vh",
               display: "flex",
               flexDirection: "column",
               overflow: "hidden",
@@ -502,18 +808,41 @@ export default function ViewForms({ onUploadNew, onBack }) {
                 alignItems: "center",
                 justifyContent: "space-between",
                 background: "#f8fafc",
+                gap: "12px",
               }}
             >
-              <div>
-                <h3 style={{ margin: 0, fontSize: "15px", color: "#0f172a" }}>
+              <div style={{ overflow: "hidden" }}>
+                <h3 style={{ margin: 0, fontSize: "15px", color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {previewItem.description}
                 </h3>
-                <span style={{ fontSize: "12px", color: "#64748b" }}>
+                <span style={{ fontSize: "12px", color: "#64748b", whiteSpace: "nowrap" }}>
                   {previewItem.fileName} • {previewItem.fileSizeFormatted} • Uploaded by {previewItem.uploadedBy || "Member"}
                 </span>
               </div>
 
-              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center", flexShrink: 0 }}>
+                {/* Print button in modal */}
+                <button
+                  type="button"
+                  onClick={() => handlePrint(previewItem)}
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    color: "#334155",
+                    background: "#f1f5f9",
+                    border: "1px solid #cbd5e1",
+                    padding: "6px 12px",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                  }}
+                  title="Print Document"
+                >
+                  🖨️ Print
+                </button>
+
                 <a
                   href={previewItem.downloadUrl || previewItem.fileUrl}
                   download={previewItem.fileName}
@@ -526,10 +855,15 @@ export default function ViewForms({ onUploadNew, onBack }) {
                     padding: "6px 12px",
                     borderRadius: "6px",
                     textDecoration: "none",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
                   }}
+                  title="Download File"
                 >
                   ⬇️ Download
                 </a>
+
                 <button
                   type="button"
                   onClick={() => setPreviewItem(null)}
@@ -558,7 +892,7 @@ export default function ViewForms({ onUploadNew, onBack }) {
                 alignItems: "center",
                 justifyContent: "center",
                 background: "#0f172a",
-                minHeight: "360px",
+                minHeight: "450px",
               }}
             >
               {previewItem.fileType === "application/pdf" || (previewItem.fileName || "").toLowerCase().endsWith(".pdf") ? (
@@ -567,7 +901,7 @@ export default function ViewForms({ onUploadNew, onBack }) {
                   title={previewItem.description}
                   style={{
                     width: "100%",
-                    height: "70vh",
+                    height: "75vh",
                     border: "none",
                     borderRadius: "4px",
                     background: "#ffffff",
